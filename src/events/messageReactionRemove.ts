@@ -1,10 +1,10 @@
 import { MessageReaction, User } from "discord.js";
 
-import { DsuClient } from "lib/core/DsuClient";
-import { EmojiSuggestionsUtility } from "../utilities/emojiSuggestions";
-import { EventLoader } from "lib/core/loader";
+import { DsuClient } from "../lib/core/DsuClient.ts";
+import { EmojiSuggestionsUtility } from "../lib/utilities/emojiSuggestions";
+import { Event } from "../lib/core/Event.ts";
 
-export default class MessageReactionRemove extends EventLoader {
+export default class MessageReactionRemove extends Event<"messageReactionRemove"> {
   constructor(client: DsuClient) {
     super(client, "messageReactionRemove");
   }

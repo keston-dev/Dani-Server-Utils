@@ -1,14 +1,13 @@
-import { AutoPingUtility } from "../utilities/autoPing";
-import { DsuClient } from "../../lib/core/DsuClient";
-import { EventLoader } from "../../lib/core/loader/EventLoader";
-import { GuildChannel } from "discord.js";
+import { DsuClient } from "../lib/core/DsuClient.ts";
+import { AnyThreadChannel } from "discord.js";
+import { Event } from "../lib/core/Event.ts";
 
-export default class ThreadCreate extends EventLoader {
+export default class ThreadCreate extends Event<"threadCreate"> {
   constructor(client: DsuClient) {
     super(client, "threadCreate");
   }
 
-  override async run(thread: GuildChannel) {
-    AutoPingUtility.onThreadCreated(this.client, thread);
+  override async run(thread: AnyThreadChannel) {
+    await this.client.utilities.autoPing.onThreadCreated(thread);
   }
 }

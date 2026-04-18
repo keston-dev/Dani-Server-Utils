@@ -10,27 +10,21 @@ import {
   Message,
   MessageFlags,
   MessageType,
-  TextChannel,
   TextDisplayBuilder,
 } from "discord.js";
-
-import { ChainHandler } from "lib/core/ChainHandler";
-import { DsuClient } from "lib/core/DsuClient";
-import { EventLoader } from "lib/core/loader/EventLoader";
-import XpManager from "lib/core/XpManager";
-import DefaultClientUtilities from "lib/util/defaultUtilities";
+import { ChainHandler } from "../lib/core/ChainHandler.ts";
+import { DsuClient } from "../lib/core/DsuClient.ts";
+import XpManager from "../lib/core/XpManager.ts";
 import { PhraseMatcherModel } from "models/PhraseMatcher";
 import { SettingsModel } from "models/Settings";
 import { TriggerModel } from "models/Trigger";
 import { XpModel } from "models/Xp";
-import { AnchorUtility } from "../utilities/anchor";
-import { AutoSlowUtility } from "../utilities/autoSlow";
-import { EmojiSuggestionsUtility } from "../utilities/emojiSuggestions";
-import { LinkHandlerUtility } from "../utilities/linkHandler";
+import { EmojiSuggestionsUtility } from "../lib/utilities/emojiSuggestions";
+import { Event } from "../lib/core/Event.ts";
 
 const chainHandler = new ChainHandler();
 
-export default class MessageCreate extends EventLoader {
+export default class MessageCreate extends Event<"messageCreate"> {
   constructor(client: DsuClient) {
     super(client, "messageCreate");
   }
@@ -73,7 +67,7 @@ export default class MessageCreate extends EventLoader {
               components: [container],
             });
           } catch (_) {
-            const embed = DefaultClientUtilities.generateEmbed("error", {
+            const embed = this.client.utilities.misc.generateEmbed("error", {
               title: "Failed to resolve guild",
               description: `Guild may be banned, deleted, or the invite expired.`,
             });
@@ -113,9 +107,13 @@ export default class MessageCreate extends EventLoader {
 
     const level = this.client.getPermLevel(message, message.member!);
 
-    const autoSlowManager = await AutoSlowUtility.getAutoSlow(message.channelId);
+    const autoSlowManager = this.client.utilities.autoSlow.getAutoSlow(message.channelId);
 
-    if (autoSlowManager != null && level < 1 && message.channel instanceof TextChannel) {
+    if (
+      autoSlowManager != null &&
+      level < 1 &&
+      message.channel.type == ChannelType.GuildText
+    ) {
       autoSlowManager.messageSent();
       autoSlowManager.setOptimalSlowMode(message.channel);
     }
@@ -125,9 +123,11 @@ export default class MessageCreate extends EventLoader {
     if (level == -1) {
       return;
     }
-    const hasLink = LinkHandlerUtility.parseMessageForLink(message.content);
+    const hasLink = this.client.utilities.linkHandler.parseMessageForLink(
+      message.content,
+    );
 
-    const canSendLinks = await LinkHandlerUtility.checkLinkPermissions(
+    const canSendLinks = await this.client.utilities.linkHandler.checkLinkPermissions(
       message.guildId ?? "",
       message.channelId,
       message.author.id,
@@ -141,16 +141,16 @@ export default class MessageCreate extends EventLoader {
       return;
     }
 
-    await AnchorUtility.handleAnchor(this.client, message);
+    await this.client.utilities.anchor.handleAnchor(message);
 
-    await chainHandler.handleMessage(message);
+    await chainHandler.handleMessage(this.client, message);
     message.author.permLevel = level;
 
     const foundPhrases = await PhraseMatcherModel.find();
 
     for (const { phrases, logChannelId } of foundPhrases) {
       for (const { content, matchThreshold } of phrases) {
-        const matches = DefaultClientUtilities.fuzzyMatch(message.content, content);
+        const matches = this.client.utilities.misc.fuzzyMatch(message.content, content);
         if (matches >= matchThreshold) {
           const logChannel = message.guild.channels.cache.get(logChannelId);
           if (
@@ -245,7 +245,7 @@ export default class MessageCreate extends EventLoader {
 
             const footer = `Matched: ${matched.map((m) => `"${m}"`).join(", ")}`;
 
-            if (DefaultClientUtilities.isColor(trigger.message.color)) {
+            if (this.client.utilities.misc.isColor(trigger.message.color)) {
               color = trigger.message.color;
             }
 
@@ -342,6 +342,5 @@ export default class MessageCreate extends EventLoader {
         await message.member?.roles.add(role);
       }
     }
-
   }
 }

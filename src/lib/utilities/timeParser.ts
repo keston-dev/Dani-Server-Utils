@@ -1,0 +1,59 @@
+import { Times, units } from "types/index.ts";
+
+export class TimeParserUtility {
+  parseDuration(durationString: string): number {
+    const durationRegex = /(\d+)([smhdwMy]?)/;
+    const matches = durationString.match(durationRegex);
+
+    if (!matches) return 0;
+
+    const value = parseInt(matches[1]);
+    const unit = matches[2];
+
+    switch (unit) {
+      case "s":
+        return value * Times.SECOND; // seconds
+      case "m":
+        return value * Times.MINUTE; // minutes
+      case "h":
+        return value * Times.HOUR; // hours
+      case "d":
+        return value * Times.DAY; // days
+      case "w":
+        return value * Times.WEEK; // weeks
+      case "M":
+        return value * Times.MONTH; // months (approximately)
+      case "y":
+        return value * Times.YEAR; // years (approximately)
+      default:
+        return 0;
+    }
+  }
+
+  parseDurationToString(
+    duration: number,
+    options?: { compact?: boolean; allowedUnits?: string[] },
+  ): string {
+    let remainingDuration = duration;
+    const parts: string[] = [];
+
+    for (const unit of units) {
+      // Skip units not in the allowedUnits array (if provided)
+      if (options?.allowedUnits && !options.allowedUnits.includes(unit.label)) {
+        continue;
+      }
+
+      const count = Math.floor(remainingDuration / unit.value);
+      if (count > 0) {
+        parts.push(
+          options?.compact
+            ? `${count}${unit.label === "month" ? "M" : unit.label[0]}`
+            : `${count} ${unit.label}${count > 1 ? "s" : ""}`,
+        );
+        remainingDuration %= unit.value;
+      }
+    }
+
+    return parts.join(options?.compact ? " " : ", ") || "0 seconds";
+  }
+}

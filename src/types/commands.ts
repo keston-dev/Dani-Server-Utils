@@ -1,11 +1,8 @@
 import {
-  AnySelectMenuInteraction,
-  ApplicationCommandData,
   ApplicationCommandOptionData,
-  AutocompleteInteraction,
-  ButtonInteraction,
-  CommandInteraction,
-  ModalSubmitInteraction,
+  ApplicationCommandType,
+  ApplicationIntegrationType,
+  InteractionContextType,
 } from "discord.js";
 
 export enum PermissionLevels {
@@ -18,46 +15,22 @@ export enum PermissionLevels {
   BOT_OWNER = 10,
 }
 
-export type BaseCommandOptions = {
-  description?: string;
+type CustomApplicationCommandOptions = ApplicationCommandOptionData & {
+  permissionLevel?: PermissionLevels;
 };
 
-export type InteractionCommandOptions = BaseCommandOptions & {
-  guildOnly?: boolean;
+export type CommandData = {
+  type: ApplicationCommandType;
+  contexts?: InteractionContextType[];
+  integration?: ApplicationIntegrationType[];
+  name: string;
+  description: string;
+  options?: CustomApplicationCommandOptions[];
+  minimumPermissionLevel: PermissionLevels;
   cooldown?: number;
-  applicationData?: CustomApplicationCommandOptionData[];
-  defaultMemberPermissions?: ApplicationCommandData["defaultMemberPermissions"];
-  type?: ApplicationCommandData["type"];
-  permissionLevel: PermissionLevels;
 };
 
-type CustomApplicationCommandOptionData = ApplicationCommandOptionData & {
-  level: PermissionLevels;
-};
-
-export type TextCommandOptions = Omit<InteractionCommandOptions, "applicationData">;
-
-export enum InteractionType {
-  AutoComplete,
-  SelectMenu,
-  ApplicationCommand,
-  Button,
-  ModalSubmit,
-}
-export type InteractionGroups =
-  | AnySelectMenuInteraction
-  | CommandInteraction
-  | ButtonInteraction
-  | AutocompleteInteraction
-  | ModalSubmitInteraction;
-
-export const BaseInteractionType: Map<InteractionType, string> = new Map<
-  InteractionType,
-  string
->([
-  [InteractionType.Button, "Button"],
-  [InteractionType.ModalSubmit, "Modal Submit"],
-  [InteractionType.ApplicationCommand, "Application Command"],
-  [InteractionType.SelectMenu, "Select Menu"],
-  [InteractionType.AutoComplete, "Auto-complete"],
-]);
+export type ResolvedCommandData = Required<
+  Pick<CommandData, "contexts" | "integration" | "options">
+> &
+  Omit<CommandData, "contexts" | "integration">;

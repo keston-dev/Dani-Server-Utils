@@ -1,14 +1,12 @@
-import { AnchorUtility } from "../utilities/anchor";
-import { AutoArchiveUtility } from "../utilities/autoArchive";
-import { DsuClient } from "../../lib/core/DsuClient";
-import { EventLoader } from "../../lib/core/loader/EventLoader";
+import { DsuClient } from "../lib/core/DsuClient.ts";
 import { ISettings } from "types/mongodb";
 import { SettingsModel } from "models/Settings";
 import { Times } from "types/index";
 import _ from "lodash";
-import { startServer } from "lib/external/server.ts";
+import { startServer } from "../lib/server/server.ts";
+import { Event } from "../lib/core/Event.ts";
 
-export default class ClientReady extends EventLoader {
+export default class ClientReady extends Event<"clientReady"> {
   constructor(client: DsuClient) {
     super(client, "clientReady");
   }
@@ -73,7 +71,6 @@ export default class ClientReady extends EventLoader {
 
     let cache = client.stringKeyCache.get("triggers");
 
-
     const dbTriggers = new Set(settings.triggers.map((t) => t.id));
 
     if (cache) {
@@ -83,23 +80,23 @@ export default class ClientReady extends EventLoader {
     }
   }
 
-  override async run(client: DsuClient) {
+  override async run() {
     const updateSettings = async () => {
-      if (client.isReady()) {
+      if (this.client.isReady()) {
         // Should catch the AsyncEventEmitter "memory leak"?
         // Presence data isn't available until the client is *truly* ready, so doing it here should fix anything from that.
-        client.user?.setPresence({
+        this.client.user?.setPresence({
           activities: [{ name: `v${process.env.npm_package_version}` }],
         });
       }
 
       await Promise.all(
-        Array.from(client.settings.keys()).map((guildId) => {
-          this.syncSettings(client, guildId).catch((e) =>
-            client.logger.error("Sync failed for guild", { guildId, error: e }),
+        Array.from(this.client.settings.keys()).map((guildId) => {
+          this.syncSettings(this.client, guildId).catch((e) =>
+            this.client.logger.error("Sync failed for guild", { guildId, error: e }),
           );
-          this.updateStringKeys(client, guildId).catch((e) =>
-            client.logger.error("Failed to update string keys for guild", {
+          this.updateStringKeys(this.client, guildId).catch((e) =>
+            this.client.logger.error("Failed to update string keys for guild", {
               guildId,
               error: e,
             }),
@@ -112,17 +109,19 @@ export default class ClientReady extends EventLoader {
 
     const interval = setInterval(
       () =>
-        updateSettings().catch((e) => client.logger.error("Periodic update failed", e)),
+        updateSettings().catch((e) =>
+          this.client.logger.error("Periodic update failed", e),
+        ),
       Times.SECOND * 3,
     );
 
-    client.once("destroy", () => clearInterval(interval));
+    this.client.once("destroy", () => clearInterval(interval));
 
-    AutoArchiveUtility.handleAutoArchive(this.client);
-    AnchorUtility.checkAnchorInactivity(this.client);
+    await this.client.utilities.autoArchive.handleAutoArchive();
+    await this.client.utilities.anchor.checkAnchorInactivity();
 
-    client.logger.info(`Bot logged in as ${client.user?.tag}.`);
+    this.client.logger.info(`Bot logged in as ${this.client.user?.tag}.`);
 
-    startServer(client);
+    startServer(this.client);
   }
 }

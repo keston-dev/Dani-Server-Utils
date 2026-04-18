@@ -1,4 +1,4 @@
-import { DsuClient } from "lib/core/DsuClient";
+import { DsuClient } from "../lib/core/DsuClient.ts";
 import { EventLoader } from "lib/core/loader";
 
 export default class Raw extends EventLoader {

@@ -1,21 +1,12 @@
-import {
-  Collection,
-  GuildMember,
-  Interaction,
-  InteractionType,
-  MessageFlags,
-} from "discord.js";
+import { Interaction, MessageFlags } from "discord.js";
 
-import { AutoPingUtility } from "../utilities/autoPing";
-import DefaultClientUtilities from "lib/util/defaultUtilities";
-import { DsuClient } from "lib/core/DsuClient";
-import { EventLoader } from "lib/core/loader/EventLoader";
+import { DsuClient } from "../lib/core/DsuClient.ts";
 import { ISettings } from "types/mongodb";
-import { PermissionLevels } from "types/commands";
 import { SettingsModel } from "models/Settings";
 import { TriggerModel } from "models/Trigger";
+import { Event } from "../lib/core/Event.ts";
 
-export default class InteractionCreate extends EventLoader {
+export default class InteractionCreate extends Event<"interactionCreate"> {
   constructor(client: DsuClient) {
     super(client, "interactionCreate");
   }
@@ -53,7 +44,7 @@ export default class InteractionCreate extends EventLoader {
     const isAutocomplete = interaction.isAutocomplete();
 
     if (isAutocomplete) {
-      await AutoPingUtility.onForumTagComplete(interaction);
+      await this.client.utilities.autoPing.onForumTagComplete(interaction);
     }
 
     // TODO emojis
@@ -98,78 +89,14 @@ export default class InteractionCreate extends EventLoader {
     }
 
     try {
-      const cooldowns = this.client.applicationCommandLoader.cooldowns;
-      this.client.logger.info(
-        `${interaction.type} interaction created by ${interaction.user.id}${
-          interaction.type === InteractionType.ApplicationCommand
-            ? `: ${interaction.toString()}`
-            : ""
-        }`,
-      );
+      if (interaction.isChatInputCommand()) {
+        const command = this.client.commands.get(interaction.commandName);
 
-      const permLevel = this.client.getPermLevel(
-        undefined,
-        interaction.member as GuildMember,
-      );
+        if (!command) return;
 
-      if (interaction.isCommand()) {
-        const command = this.client.applicationCommandLoader.fetchCommand(
-          interaction.commandName,
-        );
-
-        if (!command) {
-          return this.client.logger.error(
-            `Exception: Cannot find command to add cooldown (${interaction.commandName})`,
-          );
-        }
-        if (permLevel < PermissionLevels.MODERATOR) {
-          if (!cooldowns.has(interaction.commandName)) {
-            cooldowns.set(interaction.commandName, new Collection());
-          }
-          const now = Date.now();
-          const timestamps = this.client.applicationCommandLoader.cooldowns.get(
-            interaction.commandName,
-          );
-
-          if (!timestamps) {
-            return this.client.logger.error(`Exception: No timestamp exists.`);
-          }
-          const cooldownTimer = (command.options.cooldown ?? 0) * 1000;
-
-          if (timestamps?.has(interaction.user.id)) {
-            const expiration = timestamps.get(interaction.user.id) ?? 0 + cooldownTimer;
-            if (now < expiration) {
-              return interaction.reply({
-                flags: [MessageFlags.Ephemeral],
-                embeds: [
-                  DefaultClientUtilities.generateEmbed("error", {
-                    title: "Command on cooldown",
-                    description: `Try again in <t:${Math.round(expiration / 1000)}:R>`,
-                  }),
-                ],
-              });
-            }
-          }
-
-          timestamps.set(interaction.user.id, now);
-          setTimeout(() => timestamps.delete(interaction.user.id), cooldownTimer);
-        }
-
-        this.client.applicationCommandLoader.handle(interaction);
-      } else if (interaction.isButton()) {
-        this.client.buttonLoader.handle(interaction);
-      } else if (interaction.isAnySelectMenu()) {
-        this.client.selectMenuLoader.handle(interaction);
-      } else if (interaction.isModalSubmit()) {
-        this.client.modalLoader.handle(interaction);
-      } else if (interaction.isMessageContextMenuCommand()) {
-        this.client.applicationCommandLoader.handle(interaction);
-      } else if (interaction.isUserContextMenuCommand()) {
-        this.client.applicationCommandLoader.handle(interaction);
+        await command.preCheck(interaction);
       } else if (interaction.isAutocomplete()) {
-        const command = this.client.applicationCommandLoader.fetchCommand(
-          interaction.commandName,
-        );
+        const command = this.client.commands.get(interaction.commandName);
         if (command && command.autoComplete) {
           const focused = interaction.options.getFocused(true);
           return command.autoComplete(interaction, focused);

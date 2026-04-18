@@ -1,15 +1,14 @@
-import { DsuClient } from "lib/core/DsuClient";
-import { EventLoader } from "lib/core/loader";
-import { LinkHandlerUtility } from "../utilities/linkHandler";
-import { Message } from "discord.js";
+import { DsuClient } from "../lib/core/DsuClient.ts";
+import { Message, OmitPartialGroupDMChannel } from "discord.js";
 import { SettingsModel } from "models/Settings";
+import { Event } from "../lib/core/Event.ts";
 
-export default class MessageUpdate extends EventLoader {
+export default class MessageUpdate extends Event<"messageUpdate"> {
   constructor(client: DsuClient) {
     super(client, "messageUpdate");
   }
 
-  async run(_: Message, newMessage: Message) {
+  async run(_: OmitPartialGroupDMChannel<Message>, newMessage: Message) {
     if (newMessage.author.bot) return;
     if (newMessage.guild && !this.client.settings.has((newMessage.guild || {}).id)) {
       // We don't have the settings for this guild, find them or generate empty settings
@@ -40,9 +39,11 @@ export default class MessageUpdate extends EventLoader {
     }
 
     const level = this.client.getPermLevel(newMessage, newMessage.member!);
-    const link = LinkHandlerUtility.parseMessageForLink(newMessage.content);
+    const link = this.client.utilities.linkHandler.parseMessageForLink(
+      newMessage.content,
+    );
 
-    const canSendLinks = await LinkHandlerUtility.checkLinkPermissions(
+    const canSendLinks = await this.client.utilities.linkHandler.checkLinkPermissions(
       newMessage.guildId ?? "",
       newMessage.channelId,
       newMessage.author.id,

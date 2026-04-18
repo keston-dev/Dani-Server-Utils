@@ -1,5 +1,4 @@
 import {
-  ClientEvents,
   GatewayIntentBits,
   GuildMember,
   Message,
@@ -26,8 +25,6 @@ export interface ClientConfig {
     ) => boolean | undefined;
   }[];
 
-  prefix: string[];
-
   intents: GatewayIntentBits[];
 
   presence: PresenceData;
@@ -52,6 +49,3 @@ export const units = [
   { label: "minute", value: Times.MINUTE },
   { label: "second", value: Times.SECOND },
 ];
-
-export type AllEvents = keyof ClientEvents | "raw" | "voiceServerUpdate";
-
